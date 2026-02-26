@@ -1,65 +1,95 @@
+// NUEVO: Esta función permite a Python descargar todos los números de guía de una sola vez
+function doGet() {
+  var nombreHoja = "Hoja 1"; 
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(nombreHoja);
+  var ultimaFila = sheet.getLastRow();
+  
+  if (ultimaFila < 5) {
+    return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  // Obtenemos solo la columna G (índice 7) donde están los números de guía
+  var guias = sheet.getRange(5, 7, ultimaFila - 4, 1).getValues().flat().map(function(g) {
+    return String(g).trim();
+  });
+  
+  return ContentService.createTextOutput(JSON.stringify(guias)).setMimeType(ContentService.MimeType.JSON);
+}
+
 function doPost(e) {
   var nombreHoja = "Hoja 1"; 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(nombreHoja);
   
   var data = JSON.parse(e.postData.contents);
-  var numGuiaNueva = String(data.num_guia).trim(); 
+  var numGuiaRecibida = String(data.num_guia || "").trim(); 
   var ultimaFila = sheet.getLastRow();
-  
-  // 1. Validar duplicados (Columna G = Columna 7)
+
+  // --- 1. OPTIMIZACIÓN: CHEQUEO RÁPIDO ---
+  if (data.chequeo_rapido === true) {
+    if (ultimaFila >= 5) {
+      var guiasExistentes = sheet.getRange(5, 7, ultimaFila - 4, 1).getValues().flat().map(function(item) { 
+        return String(item).trim(); 
+      });
+      if (guiasExistentes.indexOf(numGuiaRecibida) !== -1) {
+        return ContentService.createTextOutput("YA_EXISTE");
+      }
+    }
+    return ContentService.createTextOutput("FALTA_DATOS");
+  }
+
+  // --- 2. VALIDACIÓN DE EXISTENCIA PARA INGRESO COMPLETO ---
+  var existeEnSheets = false;
   if (ultimaFila >= 5) {
-    var guiasExistentes = sheet.getRange(5, 7, ultimaFila - 4, 1).getValues().flat().map(function(item) { 
+    var guiasExistentesParaIngreso = sheet.getRange(5, 7, ultimaFila - 4, 1).getValues().flat().map(function(item) { 
       return String(item).trim(); 
     });
-    
-    if (guiasExistentes.indexOf(numGuiaNueva) !== -1) {
-      return ContentService.createTextOutput("Error: Guía duplicada");
+    if (guiasExistentesParaIngreso.indexOf(numGuiaRecibida) !== -1) {
+      existeEnSheets = true;
     }
   }
 
-  // 2. Insertar los datos al final de la tabla para luego ordenar
-  // Aplicamos toUpperCase() a todos los campos para que se guarden en MAYÚSCULAS
+  if (data.modo_verificacion === true && existeEnSheets) {
+    return ContentService.createTextOutput("Sincronizado: Guía ya presente.");
+  }
+  
+  if (data.modo_verificacion === false && existeEnSheets) {
+    return ContentService.createTextOutput("Error: Guía duplicada");
+  }
+
+  // --- 3. INSERTAR DATOS ---
   var filaParaInsertar = [
-    String(data.rut).toUpperCase(),      // Columna C
-    String(data.senores).toUpperCase(),  // Columna D
-    String(data.chofer).toUpperCase(),   // Columna E
-    String(data.patente).toUpperCase(),  // Columna F
-    String(data.num_guia).toUpperCase(), // Columna G
-    String(data.oc).toUpperCase(),       // Columna H
-    String(data.nv).toUpperCase(),       // Columna I
-    String(data.fecha).toUpperCase(),    // Columna J
-    String(data.hora).toUpperCase()      // Columna K
+    String(data.rut || "S/R").toUpperCase(),      
+    String(data.senores || "S/N").toUpperCase(),  
+    String(data.chofer || "S/C").toUpperCase(),   
+    String(data.patente || "S/P").toUpperCase(),  
+    String(data.num_guia || "S/G").toUpperCase(), 
+    String(data.oc || "S/OC").toUpperCase(),       
+    String(data.nv || "S/NV").toUpperCase(),       
+    String(data.fecha || "").toUpperCase(),    
+    String(data.hora || "").toUpperCase(),
+    String(data.traslado || "S/T").toUpperCase(),  
+    String(data.despacho || "S/D").toUpperCase()   
   ];
   
-  // Escribimos el dato al final disponible
   var rowToInsert = (ultimaFila < 5) ? 5 : ultimaFila + 1;
-  var range = sheet.getRange(rowToInsert, 3, 1, 9); 
+  var range = sheet.getRange(rowToInsert, 3, 1, 11); 
   range.setValues([filaParaInsertar]);
   
-// 3. Aplicar formato: SOLO bordes IZQUIERDO, DERECHO y VERTICALES INTERNOS
+  // --- 4. FORMATO ---
   range.setFontSize(13)
        .setHorizontalAlignment("CENTER")
        .setVerticalAlignment("MIDDLE")
        .setFontFamily("Arial")
-       .setBorder(
-         false, // Superior (Top)
-         true,  // Izquierdo (Left)
-         false, // Inferior (Bottom)
-         true,  // Derecho (Right)
-         true,  // Verticales internos
-         false, // Horizontales internos
-         "black", 
-         SpreadsheetApp.BorderStyle.SOLID_MEDIUM
-       );
+       .setBorder(false, true, false, true, true, false, "black", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // 4. ORDENAR AUTOMÁTICAMENTE
+  // --- 5. ORDENAR ---
   var nuevaUltimaFila = sheet.getLastRow();
   if (nuevaUltimaFila >= 5) {
-    var rangeToSort = sheet.getRange(5, 3, nuevaUltimaFila - 4, 9);
-    // Ordenar por la columna 7 (Número de Guía) de forma Descendente
-    rangeToSort.sort({column: 7, ascending: false});
+    var rangeToSort = sheet.getRange(5, 3, nuevaUltimaFila - 4, 11);
+    rangeToSort.sort({column: 7, ascending: false}); 
   }
   
-  return ContentService.createTextOutput("Ingreso exitoso y tabla ordenada por N° Guía");
+  return ContentService.createTextOutput(data.modo_verificacion ? "Recuperada" : "Ingreso exitoso");
 }
