@@ -1,95 +1,61 @@
-// NUEVO: Esta función permite a Python descargar todos los números de guía de una sola vez
+const CONFIG = {
+  nombreHoja: "Hoja 1",
+  filaInicio: 5,
+  columnaGuia: 7, 
+  columnaInicioDatos: 3 
+};
+
 function doGet() {
-  var nombreHoja = "Hoja 1"; 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(nombreHoja);
-  var ultimaFila = sheet.getLastRow();
-  
-  if (ultimaFila < 5) {
-    return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
+  try {
+    const guias = obtenerGuiasExistentes();
+    return ContentService.createTextOutput(JSON.stringify(guias.filter(g => g)))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (e) {
+    return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
   }
-  
-  // Obtenemos solo la columna G (índice 7) donde están los números de guía
-  var guias = sheet.getRange(5, 7, ultimaFila - 4, 1).getValues().flat().map(function(g) {
-    return String(g).trim();
-  });
-  
-  return ContentService.createTextOutput(JSON.stringify(guias)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function doPost(e) {
-  var nombreHoja = "Hoja 1"; 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(nombreHoja);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.nombreHoja);
+  const data = JSON.parse(e.postData.contents);
+  const numGuiaRecibida = String(data.num_guia || "").trim();
   
-  var data = JSON.parse(e.postData.contents);
-  var numGuiaRecibida = String(data.num_guia || "").trim(); 
-  var ultimaFila = sheet.getLastRow();
+  const ultimaFila = sheet.getLastRow();
+  const guiasExistentes = obtenerGuiasExistentes(sheet, ultimaFila);
 
-  // --- 1. OPTIMIZACIÓN: CHEQUEO RÁPIDO ---
-  if (data.chequeo_rapido === true) {
-    if (ultimaFila >= 5) {
-      var guiasExistentes = sheet.getRange(5, 7, ultimaFila - 4, 1).getValues().flat().map(function(item) { 
-        return String(item).trim(); 
-      });
-      if (guiasExistentes.indexOf(numGuiaRecibida) !== -1) {
-        return ContentService.createTextOutput("YA_EXISTE");
-      }
-    }
-    return ContentService.createTextOutput("FALTA_DATOS");
+  if (guiasExistentes.includes(numGuiaRecibida)) {
+    return ContentService.createTextOutput(data.modo_verificacion ? "Sincronizado" : "Duplicado");
   }
 
-  // --- 2. VALIDACIÓN DE EXISTENCIA PARA INGRESO COMPLETO ---
-  var existeEnSheets = false;
-  if (ultimaFila >= 5) {
-    var guiasExistentesParaIngreso = sheet.getRange(5, 7, ultimaFila - 4, 1).getValues().flat().map(function(item) { 
-      return String(item).trim(); 
-    });
-    if (guiasExistentesParaIngreso.indexOf(numGuiaRecibida) !== -1) {
-      existeEnSheets = true;
-    }
-  }
+  // CONFIGURACIÓN DE 12 COLUMNAS (C a N)
+  const filaParaInsertar = [
+    data.rut, data.senores, data.chofer, data.patente, numGuiaRecibida,
+    data.oc, data.nv, data.fecha, data.hora, data.traslado, data.despacho,
+    data.preparador // <--- Aquí llega el NOMBRE COMPLETO a la Columna N
+  ].map(val => String(val || "").toUpperCase().trim());
 
-  if (data.modo_verificacion === true && existeEnSheets) {
-    return ContentService.createTextOutput("Sincronizado: Guía ya presente.");
-  }
+  const filaDestino = Math.max(CONFIG.filaInicio, ultimaFila + 1);
+  const range = sheet.getRange(filaDestino, CONFIG.columnaInicioDatos, 1, 12);
   
-  if (data.modo_verificacion === false && existeEnSheets) {
-    return ContentService.createTextOutput("Error: Guía duplicada");
-  }
-
-  // --- 3. INSERTAR DATOS ---
-  var filaParaInsertar = [
-    String(data.rut || "S/R").toUpperCase(),      
-    String(data.senores || "S/N").toUpperCase(),  
-    String(data.chofer || "S/C").toUpperCase(),   
-    String(data.patente || "S/P").toUpperCase(),  
-    String(data.num_guia || "S/G").toUpperCase(), 
-    String(data.oc || "S/OC").toUpperCase(),       
-    String(data.nv || "S/NV").toUpperCase(),       
-    String(data.fecha || "").toUpperCase(),    
-    String(data.hora || "").toUpperCase(),
-    String(data.traslado || "S/T").toUpperCase(),  
-    String(data.despacho || "S/D").toUpperCase()   
-  ];
-  
-  var rowToInsert = (ultimaFila < 5) ? 5 : ultimaFila + 1;
-  var range = sheet.getRange(rowToInsert, 3, 1, 11); 
-  range.setValues([filaParaInsertar]);
-  
-  // --- 4. FORMATO ---
-  range.setFontSize(13)
+  range.setValues([filaParaInsertar])
+       .setFontSize(13)
        .setHorizontalAlignment("CENTER")
        .setVerticalAlignment("MIDDLE")
        .setFontFamily("Arial")
        .setBorder(false, true, false, true, true, false, "black", SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
 
-  // --- 5. ORDENAR ---
-  var nuevaUltimaFila = sheet.getLastRow();
-  if (nuevaUltimaFila >= 5) {
-    var rangeToSort = sheet.getRange(5, 3, nuevaUltimaFila - 4, 11);
-    rangeToSort.sort({column: 7, ascending: false}); 
-  }
+  // Ordenar incluyendo la nueva columna N (12 columnas)
+  sheet.getRange(CONFIG.filaInicio, CONFIG.columnaInicioDatos, sheet.getLastRow() - (CONFIG.filaInicio - 1), 12)
+       .sort({column: CONFIG.columnaGuia, ascending: false});
   
-  return ContentService.createTextOutput(data.modo_verificacion ? "Recuperada" : "Ingreso exitoso");
+  return ContentService.createTextOutput("Ingreso exitoso");
+}
+
+function obtenerGuiasExistentes(sheet, uFila) {
+  const s = sheet || SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.nombreHoja);
+  const lastRow = uFila || s.getLastRow();
+  if (lastRow < CONFIG.filaInicio) return [];
+  return s.getRange(CONFIG.filaInicio, CONFIG.columnaGuia, lastRow - (CONFIG.filaInicio - 1), 1)
+          .getValues().flat().map(g => String(g).trim());
 }

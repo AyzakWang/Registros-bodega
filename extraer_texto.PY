@@ -1,7 +1,7 @@
 import pdfplumber
 
 # Ruta del PDF que quieres analizar (puedes usar uno de tus ejemplos)
-archivo_pdf = r"P:\PLANTILLA CAJONES BODEGA\AutoHotkey\REGISTROS BODEGA\TEST EXTRACCION\T_52_GD_43376_CEDIBLE_20260226T173707.pdf"
+archivo_pdf = r"C:\Users\attexnet22\Documents\PLANTILLA CAJONES BODEGA\AutoHotkey\REGISTROS BODEGA\TEST EXTRACCION\T_52_GD_43381_CEDIBLE_20260227T133204.pdf"
 archivo_salida = "contenido_pdf.txt"
 
 try:
