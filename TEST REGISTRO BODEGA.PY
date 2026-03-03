@@ -169,13 +169,13 @@ class MonitorBodega:
 
     # helpers internos --------------------------------------------------------
     def _determinar_traslado(self, texto_up: str) -> str:
-        """Devuelve "VENTA" o "SERVICIO" según frases clave en el texto."""
+        """Devuelve "VENTA" o "NO VENTA" según frases clave en el texto."""
         if RE_TRASLADO_VENTA.search(texto_up):
             return "VENTA"
         if RE_TRASLADO_SERVICIO.search(texto_up):
-            return "SERVICIO"
+            return "NO VENTA"
         # fallback
-        return "VENTA" if "VENTA" in texto_up else "SERVICIO"
+        return "VENTA" if "VENTA" in texto_up else "NO VENTA"
 
     def _post_to_server(self, datos: dict) -> str:
         """Envia los datos a la API y retorna el texto de la respuesta."""
