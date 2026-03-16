@@ -88,9 +88,9 @@ PREPARADORES: List[str] = [
     "PEDRO SAENZ [P.S.]", "CRISTIAN RIVEROS [C.R.]",
 ]
 LISTA_CHOFERES: List[str] = [
-    "", "EDUARDO VILLAGRA", "CRISTIAN RIVEROS", "CARLOS JARA", "FABIAN GONZALEZ", "ISSAAC CROT", "JUAN ALVAREZ",
+    " ", "EDUARDO VILLAGRA", "CRISTIAN RIVEROS", "CARLOS JARA", "FABIAN GONZALEZ", "ISSAAC CROT", "JUAN ALVAREZ",
 ]
-LISTA_PATENTES: List[str] = ["", "SKXG-70", "SHRB-88", "KRPH-61"]
+LISTA_PATENTES: List[str] = [" ", "SKXG-70", "SHRB-88", "KRPH-61"]
 
 # =============================================================================
 # --- CONFIGURACIÓN DE ENTORNO ---
@@ -311,7 +311,7 @@ class NitroSystem:
                 # --- ACCIÓN PREPARADOR ---
                 if preparador_full and "[" in preparador_full:
                     acronimo = preparador_full.split("[")[1].split("]")[0]
-                    texto_a_pegar = f"PREPARADOR:{acronimo}"
+                    texto_a_pegar = f"P:{acronimo}"
                     pyautogui.click(*COORD_PREPARADOR)
                     time.sleep(SHORT_DELAY * SPEED_FACTOR)
                     pyperclip.copy(texto_a_pegar)

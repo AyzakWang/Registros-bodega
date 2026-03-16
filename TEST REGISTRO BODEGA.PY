@@ -143,7 +143,7 @@ class MonitorBodega:
     def buscar_preparador_en_texto(self, texto_pdf: str) -> str:
         """Intenta extraer abreviatura de preparador y devolver nombre completo."""
         texto_up = texto_pdf.upper()
-        match = re.search(r"PREPARADOR:?\s*([A-Z\.]+)", texto_up)
+        match = re.search(r"P:?\s*([A-Z\.]+)", texto_up)
         if match:
             posible = match.group(1).strip()
             if posible in MAPA_PREPARADORES:
